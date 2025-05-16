@@ -139,6 +139,7 @@ async function registerAttendees(accessToken, meetingId, attendeesList) {
     try {
         console.log('Registering attendees...');
         const registrationPromises = attendeesList.map(email => {
+            const namePart = email.split('@')[0];
             return axios({
                 method: 'post',
                 url: `https://api.zoom.us/v2/meetings/${meetingId}/registrants`,
@@ -148,7 +149,8 @@ async function registerAttendees(accessToken, meetingId, attendeesList) {
                 },
                 data: {
                     email: email,
-                    first_name: email.split('@')[0], // Use part before @ as first name
+                    first_name: namePart,
+                    last_name: '📸', // Required field by Zoom API
                     auto_approve: true
                 }
             });
