@@ -91,7 +91,7 @@ async function getUserId(accessToken) {
         return userResponse.data.id;
     } catch (error) {
         // If direct lookup fails, try listing users
-        if (error.response && error.response.data && error.response.data.code === 1001) {
+        if (error.response ? .data ? .code === 1001) {
             console.log('User not found directly, searching in user list...');
             const listResponse = await axios({
                 method: 'get',
@@ -137,6 +137,41 @@ const parseDate = (dateStr) => {
     }
     return date;
 };
+
+// Send calendar invitations
+async function sendCalendarInvites(accessToken, meetingId, attendeesList) {
+    try {
+        // Get the meeting invitation details
+        const inviteResponse = await axios({
+            method: 'get',
+            url: `https://api.zoom.us/v2/meetings/${meetingId}/invitation`,
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        // Send the calendar invites
+        await axios({
+            method: 'post',
+            url: `https://api.zoom.us/v2/meetings/${meetingId}/batch_invitation`,
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            data: {
+                emails: [...attendeesList, ZOOM_USER_EMAIL], // Include both attendees and host
+                send_calendar: true
+            }
+        });
+
+        console.log('Successfully sent calendar invitations');
+        return inviteResponse.data;
+    } catch (error) {
+        console.error('Failed to send calendar invitations:', error.response ? .data || error.message);
+        throw error;
+    }
+}
 
 // Create Zoom meeting
 async function createZoomMeeting() {
@@ -186,9 +221,12 @@ async function createZoomMeeting() {
                     mute_upon_entry: false,
                     waiting_room: false,
                     registrants_email_notification: true,
-                    approval_type: 0, // Automatically approve registration
-                    registration_type: 2, // Required registration
-                    email_notification: true
+                    email_notification: true,
+                    calendar_type: 2, // Outlook Calendar
+                    meeting_invitees: {
+                        enable: true
+                    },
+                    show_share_button: true
                 }
             }
         });
@@ -200,51 +238,11 @@ async function createZoomMeeting() {
         console.log('Meeting Password:', meetingDetails.password);
         console.log('Meeting Time (London):', meetingDateTime.format('DD-MM-YYYY HH:mm'));
 
-        // If there are attendees, add them to the meeting
+        // Send calendar invitations to all participants including host
         if (attendeesList.length > 0) {
-            console.log('Adding attendees to the meeting...');
-
-            // First try to add them as registrants
-            try {
-                const attendeePromises = attendeesList.map(email =>
-                    axios({
-                        method: 'post',
-                        url: `https://api.zoom.us/v2/meetings/${meetingDetails.id}/registrants`,
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
-                        },
-                        data: {
-                            email: email,
-                            first_name: email.split('@')[0], // Use part before @ as first name
-                            auto_approve: true
-                        }
-                    })
-                );
-
-                await Promise.all(attendeePromises);
-                console.log('Successfully added attendees to the meeting');
-            } catch (error) {
-                // If registration fails, try sending direct invitations
-                console.log('Could not add as registrants, sending direct invitations...');
-                try {
-                    await axios({
-                        method: 'post',
-                        url: `https://api.zoom.us/v2/meetings/${meetingDetails.id}/invitations`,
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
-                        },
-                        data: {
-                            action: 'send',
-                            email_addresses: attendeesList
-                        }
-                    });
-                    console.log('Successfully sent meeting invitations');
-                } catch (inviteError) {
-                    console.error('Failed to send invitations:', inviteError.response ? inviteError.response.data : inviteError.message);
-                }
-            }
+            console.log('Sending calendar invitations...');
+            const inviteDetails = await sendCalendarInvites(accessToken, meetingDetails.id, attendeesList);
+            console.log('Calendar invitations sent successfully');
         }
 
         // Set the outputs using the new $GITHUB_OUTPUT environment file
@@ -253,7 +251,7 @@ async function createZoomMeeting() {
             fs.appendFileSync(GITHUB_OUTPUT, `meeting_id=${meetingDetails.id}\n`);
         }
     } catch (error) {
-        console.error('Error:', error.response && error.response.data || error.message);
+        console.error('Error:', error.response ? .data || error.message);
         process.exit(1);
     }
 }
