@@ -226,7 +226,7 @@ async function createZoomMeeting() {
             fs.appendFileSync(GITHUB_OUTPUT, `meeting_id=${meetingDetails.id}\n`);
         }
     } catch (error) {
-        console.error('Error:', error.response.data || error.message);
+        console.error('Error:', error.response && error.response.data || error.message);
         process.exit(1);
     }
 }
