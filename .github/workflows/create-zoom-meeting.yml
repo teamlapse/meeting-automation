@@ -62,13 +62,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install jsonwebtoken axios moment moment-timezone
+          npm install axios moment-timezone
 
       - name: Create Zoom Meeting
         env:
-          ZOOM_API_KEY: ${{ secrets.ZOOM_API_KEY }}
-          ZOOM_API_SECRET: ${{ secrets.ZOOM_API_SECRET }}
-          ZOOM_USER_ID: ${{ secrets.ZOOM_USER_ID }}
+          ZOOM_ACCOUNT_ID: ${{ secrets.ZOOM_ACCOUNT_ID }}
+          ZOOM_CLIENT_ID: ${{ secrets.ZOOM_CLIENT_ID }}
+          ZOOM_CLIENT_SECRET: ${{ secrets.ZOOM_CLIENT_SECRET }}
+          ZOOM_USER_EMAIL: ${{ secrets.ZOOM_USER_EMAIL }}
           MEETING_NAME: ${{ github.event.inputs.meeting_name }}
           MEETING_DATE: ${{ github.event.inputs.meeting_date }}
           MEETING_TIME: ${{ github.event.inputs.meeting_time }}

@@ -1,13 +1,13 @@
-const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const moment = require('moment-timezone');
 const fs = require('fs');
 
 // Get environment variables
 const {
-    ZOOM_API_KEY,
-    ZOOM_API_SECRET,
-    ZOOM_USER_ID,
+    ZOOM_ACCOUNT_ID,
+    ZOOM_CLIENT_ID,
+    ZOOM_CLIENT_SECRET,
+    ZOOM_USER_EMAIL,
     MEETING_NAME,
     MEETING_DATE,
     MEETING_TIME,
@@ -19,14 +19,27 @@ const {
 // London timezone
 const TIMEZONE = 'Europe/London';
 
-// Generate JWT token for Zoom API authentication
-const generateToken = () => {
-    const payload = {
-        iss: ZOOM_API_KEY,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60, // Token expires in 1 hour
-    };
-    return jwt.sign(payload, ZOOM_API_SECRET);
-};
+// Get OAuth access token
+async function getAccessToken() {
+    try {
+        const tokenResponse = await axios({
+                    method: 'post',
+                    url: 'https://zoom.us/oauth/token',
+                    params: {
+                        grant_type: 'account_credentials',
+                        account_id: ZOOM_ACCOUNT_ID
+                    },
+                    headers: {
+                        'Authorization': `Basic ${Buffer.from(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`).toString('base64')}`
+            }
+        });
+
+        return tokenResponse.data.access_token;
+    } catch (error) {
+        console.error('Error getting access token:', error.response?.data || error.message);
+        throw error;
+    }
+}
 
 // Parse attendees string into array
 const parseAttendees = (attendeesString) => {
@@ -49,9 +62,13 @@ const parseDate = (dateStr) => {
 // Create Zoom meeting
 async function createZoomMeeting() {
     try {
+        // Get access token
+        const accessToken = await getAccessToken();
+        console.log('Successfully obtained access token');
+
         // Parse and validate the date
         const date = parseDate(MEETING_DATE);
-
+        
         // Combine date and time
         const meetingDateTime = moment.tz(`${date.format('YYYY-MM-DD')} ${MEETING_TIME}`, 'YYYY-MM-DD HH:mm', TIMEZONE);
         const attendeesList = parseAttendees(ATTENDEES);
@@ -66,12 +83,24 @@ async function createZoomMeeting() {
             throw new Error('Meeting time must be in the future');
         }
 
-        const token = generateToken();
+        // First, get the user ID from email
+        const userResponse = await axios({
+            method: 'get',
+            url: `https://api.zoom.us/v2/users/${ZOOM_USER_EMAIL}`,
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const userId = userResponse.data.id;
+        console.log('Successfully retrieved user ID');
+
         const response = await axios({
             method: 'post',
-            url: `https://api.zoom.us/v2/users/${ZOOM_USER_ID}/meetings`,
+            url: `https://api.zoom.us/v2/users/${userId}/meetings`,
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             },
             data: {
@@ -96,7 +125,6 @@ async function createZoomMeeting() {
         console.log('Meeting Link:', meetingDetails.join_url);
         console.log('Meeting ID:', meetingDetails.id);
         console.log('Meeting Password:', meetingDetails.password);
-        // Format the output date in UK format
         console.log('Meeting Time (London):', meetingDateTime.format('DD-MM-YYYY HH:mm'));
 
         // If there are attendees, add them to the meeting
@@ -107,7 +135,7 @@ async function createZoomMeeting() {
                     method: 'post',
                     url: `https://api.zoom.us/v2/meetings/${meetingDetails.id}/registrants`,
                     headers: {
-                        'Authorization': `Bearer ${token}`,
+                        'Authorization': `Bearer ${accessToken}`,
                         'Content-Type': 'application/json'
                     },
                     data: {
@@ -128,7 +156,7 @@ async function createZoomMeeting() {
             fs.appendFileSync(GITHUB_OUTPUT, `meeting_id=${meetingDetails.id}\n`);
         }
     } catch (error) {
-        console.error('Error creating Zoom meeting:', error.response && error.response.data || error.message);
+        console.error('Error:', error.response?.data || error.message);
         process.exit(1);
     }
 }
