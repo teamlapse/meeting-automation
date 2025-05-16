@@ -1,6 +1,6 @@
 # Zoom Meeting Creator GitHub Action
 
-This GitHub Action allows you to create Zoom meetings directly from GitHub. Anyone can trigger the action to create a meeting using a specified Zoom account.
+This GitHub Action allows you to create Zoom meetings directly from GitHub. Anyone can trigger the action to create a meeting using a specified Zoom account. All meetings are scheduled in London time (automatically adjusting for daylight saving).
 
 ## Setup
 
@@ -32,10 +32,10 @@ You can create a meeting in two ways:
    - Click "Run workflow"
    - Fill in the required information:
      - Meeting Name
-     - Date (YYYY-MM-DD)
-     - Time (HH:MM in 24-hour format)
+     - Date (YYYY-MM-DD format)
+     - Time (select from available slots between 09:00-19:00, 30-minute intervals)
      - Duration (in minutes, default: 60)
-     - Timezone (default: UTC)
+     - Attendees (optional: comma-separated email addresses)
 
 2. **Through GitHub API:**
 ```bash
@@ -50,7 +50,7 @@ curl -X POST \
       "meeting_date": "2024-03-20",
       "meeting_time": "14:30",
       "duration": "60",
-      "timezone": "America/New_York"
+      "attendees": "user1@example.com, user2@example.com"
     }
   }'
 ```
@@ -61,15 +61,19 @@ The action will output:
 - Meeting URL
 - Meeting ID
 - Meeting Password
+- Meeting Time (in London timezone)
 
 These details will be available in the workflow run logs.
 
 ## Features
 
-- Schedule meetings at any date and time
+- Schedule meetings with convenient time slot selection (09:00-19:00, 30-min intervals)
+- London timezone with automatic daylight saving adjustment
 - Specify meeting duration
-- Support for different timezones
+- Invite multiple attendees via email
 - Automatic meeting password generation
 - Join URL generation
 - Host and participant video enabled by default
-- Participants can join before host 
+- Participants can join before host
+- Email notifications for attendees
+- Automatic attendee registration and approval 

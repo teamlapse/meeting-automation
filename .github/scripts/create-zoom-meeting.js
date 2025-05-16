@@ -12,9 +12,12 @@ const {
     MEETING_DATE,
     MEETING_TIME,
     DURATION,
-    TIMEZONE,
+    ATTENDEES,
     GITHUB_OUTPUT
 } = process.env;
+
+// London timezone
+const TIMEZONE = 'Europe/London';
 
 // Generate JWT token for Zoom API authentication
 const generateToken = () => {
@@ -25,11 +28,25 @@ const generateToken = () => {
     return jwt.sign(payload, ZOOM_API_SECRET);
 };
 
+// Parse attendees string into array
+const parseAttendees = (attendeesString) => {
+    if (!attendeesString) return [];
+    return attendeesString.split(',')
+        .map(email => email.trim())
+        .filter(email => email.length > 0);
+};
+
 // Create Zoom meeting
 async function createZoomMeeting() {
     try {
         // Format the meeting time
-        const meetingDateTime = moment.tz(`${MEETING_DATE} ${MEETING_TIME}`, TIMEZONE);
+        const meetingDateTime = moment.tz(`${MEETING_DATE} ${MEETING_TIME}`, 'YYYY-MM-DD HH:mm', TIMEZONE);
+        const attendeesList = parseAttendees(ATTENDEES);
+
+        // Verify that the meeting time is valid
+        if (!meetingDateTime.isValid()) {
+            throw new Error('Invalid meeting date/time format. Please use YYYY-MM-DD for date.');
+        }
 
         const token = generateToken();
         const response = await axios({
@@ -50,7 +67,8 @@ async function createZoomMeeting() {
                     participant_video: true,
                     join_before_host: true,
                     mute_upon_entry: false,
-                    waiting_room: false
+                    waiting_room: false,
+                    registrants_email_notification: true
                 }
             }
         });
@@ -60,6 +78,30 @@ async function createZoomMeeting() {
         console.log('Meeting Link:', meetingDetails.join_url);
         console.log('Meeting ID:', meetingDetails.id);
         console.log('Meeting Password:', meetingDetails.password);
+        console.log('Meeting Time (London):', meetingDateTime.format('YYYY-MM-DD HH:mm'));
+
+        // If there are attendees, add them to the meeting
+        if (attendeesList.length > 0) {
+            console.log('Adding attendees to the meeting...');
+            const attendeePromises = attendeesList.map(email =>
+                axios({
+                    method: 'post',
+                    url: `https://api.zoom.us/v2/meetings/${meetingDetails.id}/registrants`,
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    data: {
+                        email: email,
+                        first_name: email.split('@')[0], // Use part before @ as first name
+                        auto_approve: true
+                    }
+                })
+            );
+
+            await Promise.all(attendeePromises);
+            console.log('Successfully added attendees to the meeting');
+        }
 
         // Set the outputs using the new $GITHUB_OUTPUT environment file
         if (GITHUB_OUTPUT) {
