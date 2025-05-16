@@ -210,12 +210,11 @@ async function createZoomMeeting() {
                     join_before_host: true,
                     mute_upon_entry: false,
                     waiting_room: false,
-                    approval_type: 2, // Auto approve registrants
-                    registration_type: 1, // Required registration
+                    approval_type: 0,
+                    registration_type: 2,
                     registrants_email_notification: true,
                     registrants_confirmation_email: true,
-                    push_change_to_calendar: true,
-                    registration_required: true // Explicitly enable registration
+                    push_change_to_calendar: true
                 }
             }
         });
