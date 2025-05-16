@@ -137,32 +137,20 @@ const parseDate = (dateStr) => {
 // Send calendar invitations
 async function sendCalendarInvites(accessToken, meetingId, attendeesList) {
     try {
-        // Get the meeting invitation details
-        const inviteResponse = await axios({
-            method: 'get',
-            url: `https://api.zoom.us/v2/meetings/${meetingId}/invitation`,
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
         // Send the calendar invites
         await axios({
             method: 'post',
-            url: `https://api.zoom.us/v2/meetings/${meetingId}/batch_invitation`,
+            url: `https://api.zoom.us/v2/meetings/${meetingId}/invite_email`,
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             },
             data: {
-                emails: [...attendeesList, ZOOM_USER_EMAIL], // Include both attendees and host
-                send_calendar: true
+                email_addresses: attendeesList
             }
         });
 
         console.log('Successfully sent calendar invitations');
-        return inviteResponse.data;
     } catch (error) {
         console.error('Failed to send calendar invitations:', error.response && error.response.data ? error.response.data : error.message);
         throw error;
@@ -216,8 +204,9 @@ async function createZoomMeeting() {
                     join_before_host: true,
                     mute_upon_entry: false,
                     waiting_room: false,
-                    registrants_email_notification: true,
-                    email_notification: true
+                    email_notification: true,
+                    calendar_type: 1,
+                    meeting_invitees: attendeesList.map(email => ({ email }))
                 }
             }
         });
@@ -229,10 +218,10 @@ async function createZoomMeeting() {
         console.log('Meeting Password:', meetingDetails.password);
         console.log('Meeting Time (London):', meetingDateTime.format('DD-MM-YYYY HH:mm'));
 
-        // Send calendar invitations to all participants including host
+        // Send calendar invitations to all participants
         if (attendeesList.length > 0) {
             console.log('Sending calendar invitations...');
-            const inviteDetails = await sendCalendarInvites(accessToken, meetingDetails.id, attendeesList);
+            await sendCalendarInvites(accessToken, meetingDetails.id, attendeesList);
             console.log('Calendar invitations sent successfully');
         }
 
