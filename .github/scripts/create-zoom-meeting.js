@@ -65,12 +65,8 @@ async function getAccessToken() {
 
         return tokenResponse.data.access_token;
     } catch (error) {
-        if (error.response) {
-            console.error('Zoom API Error Details:', {
-                status: error.response.status,
-                statusText: error.response.statusText,
-                data: error.response.data
-            });
+        if (error.response && error.response.data) {
+            console.error('Zoom API Error Details:', error.response.data);
         }
         throw error;
     }
@@ -91,7 +87,7 @@ async function getUserId(accessToken) {
         return userResponse.data.id;
     } catch (error) {
         // If direct lookup fails, try listing users
-        if (error.response ? .data ? .code === 1001) {
+        if (error.response && error.response.data && error.response.data.code === 1001) {
             console.log('User not found directly, searching in user list...');
             const listResponse = await axios({
                 method: 'get',
@@ -168,7 +164,7 @@ async function sendCalendarInvites(accessToken, meetingId, attendeesList) {
         console.log('Successfully sent calendar invitations');
         return inviteResponse.data;
     } catch (error) {
-        console.error('Failed to send calendar invitations:', error.response ? .data || error.message);
+        console.error('Failed to send calendar invitations:', error.response && error.response.data ? error.response.data : error.message);
         throw error;
     }
 }
@@ -251,7 +247,11 @@ async function createZoomMeeting() {
             fs.appendFileSync(GITHUB_OUTPUT, `meeting_id=${meetingDetails.id}\n`);
         }
     } catch (error) {
-        console.error('Error:', error.response ? .data || error.message);
+        if (error.response && error.response.data) {
+            console.error('Error:', error.response.data);
+        } else {
+            console.error('Error:', error.message);
+        }
         process.exit(1);
     }
 }
