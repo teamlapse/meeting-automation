@@ -135,8 +135,19 @@ const parseDate = (dateStr) => {
 };
 
 // Send calendar invitations
-async function sendCalendarInvites(accessToken, meetingId, attendeesList) {
+async function sendCalendarInvites(accessToken, meetingId, attendeesList, meetingDetails, meetingDateTime) {
     try {
+        // Format the meeting description with the join link
+        const description = `
+Join Zoom Meeting
+${meetingDetails.join_url}
+
+Meeting ID: ${meetingDetails.id}
+Passcode: ${meetingDetails.password}
+
+One tap mobile
+${meetingDetails.join_url}`;
+
         // Send the calendar invites using batch registration
         await axios({
             method: 'post',
@@ -151,7 +162,17 @@ async function sendCalendarInvites(accessToken, meetingId, attendeesList) {
                 registrants: attendeesList.map(email => ({
                     email: email,
                     first_name: email.split('@')[0],
-                    last_name: ''
+                    last_name: '',
+                    org: '',
+                    job_title: '',
+                    purchasing_time_frame: '',
+                    role_in_purchase_process: '',
+                    no_of_employees: '',
+                    comments: '',
+                    custom_questions: [{
+                        title: "Meeting Information",
+                        value: description
+                    }]
                 }))
             }
         });
@@ -204,6 +225,7 @@ async function createZoomMeeting() {
                 start_time: meetingDateTime.format('YYYY-MM-DDTHH:mm:ss'),
                 duration: parseInt(DURATION),
                 timezone: TIMEZONE,
+                agenda: `Join URL: ${MEETING_NAME}\n\nThis is a Zoom meeting created via GitHub Actions.`,
                 settings: {
                     host_video: true,
                     participant_video: true,
@@ -213,7 +235,14 @@ async function createZoomMeeting() {
                     email_notification: true,
                     approval_type: 0,
                     registration_type: 2,
-                    registrants_email_notification: true
+                    registrants_email_notification: true,
+                    calendar_type: 2,
+                    meeting_authentication: false,
+                    alternative_hosts_email_notification: true,
+                    contact_email: ZOOM_USER_EMAIL,
+                    contact_name: ZOOM_USER_EMAIL.split('@')[0],
+                    email_notification: true,
+                    registrants_confirmation_email: true
                 }
             }
         });
@@ -228,7 +257,7 @@ async function createZoomMeeting() {
         // Register attendees for the meeting
         if (attendeesList.length > 0) {
             console.log('Registering attendees...');
-            await sendCalendarInvites(accessToken, meetingDetails.id, attendeesList);
+            await sendCalendarInvites(accessToken, meetingDetails.id, attendeesList, meetingDetails, meetingDateTime);
             console.log('Attendees registered successfully');
         }
 
