@@ -206,8 +206,8 @@ async function createZoomMeeting() {
             },
             data: {
                 topic: MEETING_NAME,
-                type: 2, // Scheduled meeting
-                start_time: meetingDateTime.format(),
+                type: 2,
+                start_time: meetingDateTime.format('YYYY-MM-DDTHH:mm:ss'),
                 duration: parseInt(DURATION),
                 timezone: TIMEZONE,
                 settings: {
@@ -217,12 +217,7 @@ async function createZoomMeeting() {
                     mute_upon_entry: false,
                     waiting_room: false,
                     registrants_email_notification: true,
-                    email_notification: true,
-                    calendar_type: 2, // Outlook Calendar
-                    meeting_invitees: {
-                        enable: true
-                    },
-                    show_share_button: true
+                    email_notification: true
                 }
             }
         });
