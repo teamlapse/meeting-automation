@@ -135,51 +135,24 @@ const parseDate = (dateStr) => {
 };
 
 // Send calendar invitations
-async function sendCalendarInvites(accessToken, meetingId, attendeesList, meetingDetails, meetingDateTime) {
+async function sendCalendarInvites(accessToken, meetingId, attendeesList) {
     try {
-        // Format the meeting description with the join link
-        const description = `
-Join Zoom Meeting
-${meetingDetails.join_url}
-
-Meeting ID: ${meetingDetails.id}
-Passcode: ${meetingDetails.password}
-
-One tap mobile
-${meetingDetails.join_url}`;
-
-        // Send the calendar invites using batch registration
+        // Send email invitations with calendar attachments
         await axios({
             method: 'post',
-            url: `https://api.zoom.us/v2/meetings/${meetingId}/batch_registrants`,
+            url: `https://api.zoom.us/v2/meetings/${meetingId}/invite/email`,
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             },
             data: {
-                auto_approve: true,
-                registrants_confirmation_email: true,
-                registrants: attendeesList.map(email => ({
-                    email: email,
-                    first_name: email.split('@')[0],
-                    last_name: '',
-                    org: '',
-                    job_title: '',
-                    purchasing_time_frame: '',
-                    role_in_purchase_process: '',
-                    no_of_employees: '',
-                    comments: '',
-                    custom_questions: [{
-                        title: "Meeting Information",
-                        value: description
-                    }]
-                }))
+                email_addresses: attendeesList
             }
         });
 
-        console.log('Successfully registered attendees for the meeting');
+        console.log('Successfully sent calendar invitations');
     } catch (error) {
-        console.error('Failed to register attendees:', error.response && error.response.data ? error.response.data : error.message);
+        console.error('Failed to send calendar invitations:', error.response && error.response.data ? error.response.data : error.message);
         throw error;
     }
 }
@@ -233,16 +206,13 @@ async function createZoomMeeting() {
                     mute_upon_entry: false,
                     waiting_room: false,
                     email_notification: true,
-                    approval_type: 0,
-                    registration_type: 2,
-                    registrants_email_notification: true,
-                    calendar_type: 2,
-                    meeting_authentication: false,
                     alternative_hosts_email_notification: true,
                     contact_email: ZOOM_USER_EMAIL,
                     contact_name: ZOOM_USER_EMAIL.split('@')[0],
-                    email_notification: true,
-                    registrants_confirmation_email: true
+                    meeting_invitees: attendeesList.map(email => ({ email })),
+                    registrants_email_notification: true,
+                    registrants_confirmation_email: true,
+                    push_change_to_calendar: true
                 }
             }
         });
@@ -254,11 +224,11 @@ async function createZoomMeeting() {
         console.log('Meeting Password:', meetingDetails.password);
         console.log('Meeting Time (London):', meetingDateTime.format('DD-MM-YYYY HH:mm'));
 
-        // Register attendees for the meeting
+        // Send calendar invitations
         if (attendeesList.length > 0) {
-            console.log('Registering attendees...');
-            await sendCalendarInvites(accessToken, meetingDetails.id, attendeesList, meetingDetails, meetingDateTime);
-            console.log('Attendees registered successfully');
+            console.log('Sending calendar invitations...');
+            await sendCalendarInvites(accessToken, meetingDetails.id, attendeesList);
+            console.log('Calendar invitations sent successfully');
         }
 
         // Set the outputs using the new $GITHUB_OUTPUT environment file
