@@ -134,25 +134,30 @@ const parseDate = (dateStr) => {
     return date;
 };
 
-// Send calendar invitations
-async function sendCalendarInvites(accessToken, meetingId, attendeesList) {
+// Register attendees using the registrants API
+async function registerAttendees(accessToken, meetingId, attendeesList) {
     try {
-        // Send email invitations with calendar attachments
-        await axios({
-            method: 'post',
-            url: `https://api.zoom.us/v2/meetings/${meetingId}/invite/email`,
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            data: {
-                email_addresses: attendeesList
-            }
+        console.log('Registering attendees...');
+        const registrationPromises = attendeesList.map(email => {
+            return axios({
+                method: 'post',
+                url: `https://api.zoom.us/v2/meetings/${meetingId}/registrants`,
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                data: {
+                    email: email,
+                    first_name: email.split('@')[0], // Use part before @ as first name
+                    auto_approve: true
+                }
+            });
         });
 
-        console.log('Successfully sent calendar invitations');
+        await Promise.all(registrationPromises);
+        console.log('Successfully registered all attendees');
     } catch (error) {
-        console.error('Failed to send calendar invitations:', error.response && error.response.data ? error.response.data : error.message);
+        console.error('Failed to register attendees:', error.response && error.response.data ? error.response.data : error.message);
         throw error;
     }
 }
@@ -205,11 +210,8 @@ async function createZoomMeeting() {
                     join_before_host: true,
                     mute_upon_entry: false,
                     waiting_room: false,
-                    email_notification: true,
-                    alternative_hosts_email_notification: true,
-                    contact_email: ZOOM_USER_EMAIL,
-                    contact_name: ZOOM_USER_EMAIL.split('@')[0],
-                    meeting_invitees: attendeesList.map(email => ({ email })),
+                    approval_type: 2, // Auto approve registrants
+                    registration_type: 2, // Required registration
                     registrants_email_notification: true,
                     registrants_confirmation_email: true,
                     push_change_to_calendar: true
@@ -224,11 +226,11 @@ async function createZoomMeeting() {
         console.log('Meeting Password:', meetingDetails.password);
         console.log('Meeting Time (London):', meetingDateTime.format('DD-MM-YYYY HH:mm'));
 
-        // Send calendar invitations
+        // Register attendees using the registrants API
         if (attendeesList.length > 0) {
-            console.log('Sending calendar invitations...');
-            await sendCalendarInvites(accessToken, meetingDetails.id, attendeesList);
-            console.log('Calendar invitations sent successfully');
+            console.log('Registering attendees...');
+            await registerAttendees(accessToken, meetingDetails.id, attendeesList);
+            console.log('Attendees registered successfully');
         }
 
         // Set the outputs using the new $GITHUB_OUTPUT environment file
