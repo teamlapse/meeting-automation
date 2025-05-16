@@ -1,0 +1,55 @@
+name: Create Zoom Meeting
+
+on:
+  workflow_dispatch:
+    inputs:
+      meeting_name:
+        description: 'Name of the Zoom meeting'
+        required: true
+        type: string
+      meeting_date:
+        description: 'Date of the meeting (YYYY-MM-DD)'
+        required: true
+        type: string
+      meeting_time:
+        description: 'Time of the meeting (HH:MM) in 24-hour format'
+        required: true
+        type: string
+      duration:
+        description: 'Duration of meeting in minutes'
+        required: true
+        type: string
+        default: '60'
+      timezone:
+        description: 'Timezone (e.g. America/New_York)'
+        required: true
+        type: string
+        default: 'UTC'
+
+jobs:
+  create-meeting:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          npm install jsonwebtoken axios moment
+
+      - name: Create Zoom Meeting
+        env:
+          ZOOM_API_KEY: ${{ secrets.ZOOM_API_KEY }}
+          ZOOM_API_SECRET: ${{ secrets.ZOOM_API_SECRET }}
+          ZOOM_USER_ID: ${{ secrets.ZOOM_USER_ID }}
+          MEETING_NAME: ${{ github.event.inputs.meeting_name }}
+          MEETING_DATE: ${{ github.event.inputs.meeting_date }}
+          MEETING_TIME: ${{ github.event.inputs.meeting_time }}
+          DURATION: ${{ github.event.inputs.duration }}
+          TIMEZONE: ${{ github.event.inputs.timezone }}
+        run: node .github/scripts/create-zoom-meeting.js 
