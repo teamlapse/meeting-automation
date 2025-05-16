@@ -185,7 +185,10 @@ async function createZoomMeeting() {
                     join_before_host: true,
                     mute_upon_entry: false,
                     waiting_room: false,
-                    registrants_email_notification: true
+                    registrants_email_notification: true,
+                    approval_type: 0, // Automatically approve registration
+                    registration_type: 2, // Required registration
+                    email_notification: true
                 }
             }
         });
@@ -200,24 +203,48 @@ async function createZoomMeeting() {
         // If there are attendees, add them to the meeting
         if (attendeesList.length > 0) {
             console.log('Adding attendees to the meeting...');
-            const attendeePromises = attendeesList.map(email =>
-                axios({
-                    method: 'post',
-                    url: `https://api.zoom.us/v2/meetings/${meetingDetails.id}/registrants`,
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    data: {
-                        email: email,
-                        first_name: email.split('@')[0], // Use part before @ as first name
-                        auto_approve: true
-                    }
-                })
-            );
 
-            await Promise.all(attendeePromises);
-            console.log('Successfully added attendees to the meeting');
+            // First try to add them as registrants
+            try {
+                const attendeePromises = attendeesList.map(email =>
+                    axios({
+                        method: 'post',
+                        url: `https://api.zoom.us/v2/meetings/${meetingDetails.id}/registrants`,
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        data: {
+                            email: email,
+                            first_name: email.split('@')[0], // Use part before @ as first name
+                            auto_approve: true
+                        }
+                    })
+                );
+
+                await Promise.all(attendeePromises);
+                console.log('Successfully added attendees to the meeting');
+            } catch (error) {
+                // If registration fails, try sending direct invitations
+                console.log('Could not add as registrants, sending direct invitations...');
+                try {
+                    await axios({
+                        method: 'post',
+                        url: `https://api.zoom.us/v2/meetings/${meetingDetails.id}/invitations`,
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        data: {
+                            action: 'send',
+                            email_addresses: attendeesList
+                        }
+                    });
+                    console.log('Successfully sent meeting invitations');
+                } catch (inviteError) {
+                    console.error('Failed to send invitations:', inviteError.response ? inviteError.response.data : inviteError.message);
+                }
+            }
         }
 
         // Set the outputs using the new $GITHUB_OUTPUT environment file
