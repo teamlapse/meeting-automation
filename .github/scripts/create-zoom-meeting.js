@@ -19,24 +19,103 @@ const {
 // London timezone
 const TIMEZONE = 'Europe/London';
 
+// Validate credentials
+function validateCredentials() {
+    const missing = [];
+    if (!ZOOM_ACCOUNT_ID) missing.push('ZOOM_ACCOUNT_ID');
+    if (!ZOOM_CLIENT_ID) missing.push('ZOOM_CLIENT_ID');
+    if (!ZOOM_CLIENT_SECRET) missing.push('ZOOM_CLIENT_SECRET');
+    if (!ZOOM_USER_EMAIL) missing.push('ZOOM_USER_EMAIL');
+
+    if (missing.length > 0) {
+        throw new Error(`Missing required credentials: ${missing.join(', ')}`);
+    }
+
+    // Log partial credentials for debugging (safely)
+    console.log('Credentials check:');
+    console.log('Account ID:', `${ZOOM_ACCOUNT_ID.slice(0, 4)}...`);
+    console.log('Client ID:', `${ZOOM_CLIENT_ID.slice(0, 4)}...`);
+    console.log('Client Secret length:', ZOOM_CLIENT_SECRET.length);
+    console.log('User Email:', ZOOM_USER_EMAIL);
+}
+
 // Get OAuth access token
 async function getAccessToken() {
     try {
+        validateCredentials();
+
+        const authString = Buffer.from(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`).toString('base64');
+        console.log('Making token request to Zoom...');
+
         const tokenResponse = await axios({
-                    method: 'post',
-                    url: 'https://zoom.us/oauth/token',
-                    params: {
-                        grant_type: 'account_credentials',
-                        account_id: ZOOM_ACCOUNT_ID
-                    },
-                    headers: {
-                        'Authorization': `Basic ${Buffer.from(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`).toString('base64')}`
+            method: 'post',
+            url: 'https://zoom.us/oauth/token',
+            params: {
+                grant_type: 'account_credentials',
+                account_id: ZOOM_ACCOUNT_ID
+            },
+            headers: {
+                'Authorization': `Basic ${authString}`
             }
         });
 
+        if (!tokenResponse.data || !tokenResponse.data.access_token) {
+            throw new Error('No access token received in response');
+        }
+
         return tokenResponse.data.access_token;
     } catch (error) {
-        console.error('Error getting access token:', error.response?.data || error.message);
+        if (error.response) {
+            console.error('Zoom API Error Details:', {
+                status: error.response.status,
+                statusText: error.response.statusText,
+                data: error.response.data
+            });
+        }
+        throw error;
+    }
+}
+
+// Get user ID from email
+async function getUserId(accessToken) {
+    try {
+        // First try to get user directly
+        const userResponse = await axios({
+            method: 'get',
+            url: `https://api.zoom.us/v2/users/${ZOOM_USER_EMAIL}`,
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        return userResponse.data.id;
+    } catch (error) {
+        // If direct lookup fails, try listing users
+        if (error.response ? .data ? .code === 1001) {
+            console.log('User not found directly, searching in user list...');
+            const listResponse = await axios({
+                method: 'get',
+                url: 'https://api.zoom.us/v2/users',
+                params: {
+                    status: 'active',
+                    page_size: 100
+                },
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const user = listResponse.data.users.find(u =>
+                u.email.toLowerCase() === ZOOM_USER_EMAIL.toLowerCase()
+            );
+
+            if (!user) {
+                throw new Error(`User with email ${ZOOM_USER_EMAIL} not found in account. Available users: ${listResponse.data.users.map(u => u.email).join(', ')}`);
+            }
+
+            return user.id;
+        }
         throw error;
     }
 }
@@ -68,7 +147,7 @@ async function createZoomMeeting() {
 
         // Parse and validate the date
         const date = parseDate(MEETING_DATE);
-        
+
         // Combine date and time
         const meetingDateTime = moment.tz(`${date.format('YYYY-MM-DD')} ${MEETING_TIME}`, 'YYYY-MM-DD HH:mm', TIMEZONE);
         const attendeesList = parseAttendees(ATTENDEES);
@@ -83,17 +162,8 @@ async function createZoomMeeting() {
             throw new Error('Meeting time must be in the future');
         }
 
-        // First, get the user ID from email
-        const userResponse = await axios({
-            method: 'get',
-            url: `https://api.zoom.us/v2/users/${ZOOM_USER_EMAIL}`,
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const userId = userResponse.data.id;
+        // Get user ID
+        const userId = await getUserId(accessToken);
         console.log('Successfully retrieved user ID');
 
         const response = await axios({
@@ -156,7 +226,7 @@ async function createZoomMeeting() {
             fs.appendFileSync(GITHUB_OUTPUT, `meeting_id=${meetingDetails.id}\n`);
         }
     } catch (error) {
-        console.error('Error:', error.response?.data || error.message);
+        console.error('Error:', error.response ? .data || error.message);
         process.exit(1);
     }
 }
