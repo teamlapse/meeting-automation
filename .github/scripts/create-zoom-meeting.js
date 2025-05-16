@@ -211,10 +211,11 @@ async function createZoomMeeting() {
                     mute_upon_entry: false,
                     waiting_room: false,
                     approval_type: 2, // Auto approve registrants
-                    registration_type: 2, // Required registration
+                    registration_type: 1, // Required registration
                     registrants_email_notification: true,
                     registrants_confirmation_email: true,
-                    push_change_to_calendar: true
+                    push_change_to_calendar: true,
+                    registration_required: true // Explicitly enable registration
                 }
             }
         });
