@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
-const moment = require('moment');
+const moment = require('moment-timezone');
 const fs = require('fs');
 
 // Get environment variables
@@ -36,16 +36,34 @@ const parseAttendees = (attendeesString) => {
         .filter(email => email.length > 0);
 };
 
+// Validate and parse date
+const parseDate = (dateStr) => {
+    // Try to parse the date in DD-MM-YYYY format
+    const date = moment(dateStr, 'DD-MM-YYYY', true);
+    if (!date.isValid()) {
+        throw new Error('Invalid date format. Please use DD-MM-YYYY format (e.g., 16-05-2025)');
+    }
+    return date;
+};
+
 // Create Zoom meeting
 async function createZoomMeeting() {
     try {
-        // Format the meeting time
-        const meetingDateTime = moment.tz(`${MEETING_DATE} ${MEETING_TIME}`, 'YYYY-MM-DD HH:mm', TIMEZONE);
+        // Parse and validate the date
+        const date = parseDate(MEETING_DATE);
+
+        // Combine date and time
+        const meetingDateTime = moment.tz(`${date.format('YYYY-MM-DD')} ${MEETING_TIME}`, 'YYYY-MM-DD HH:mm', TIMEZONE);
         const attendeesList = parseAttendees(ATTENDEES);
 
-        // Verify that the meeting time is valid
+        // Additional validation
         if (!meetingDateTime.isValid()) {
-            throw new Error('Invalid meeting date/time format. Please use YYYY-MM-DD for date.');
+            throw new Error('Invalid meeting time format');
+        }
+
+        // Verify the meeting is in the future
+        if (meetingDateTime.isBefore(moment())) {
+            throw new Error('Meeting time must be in the future');
         }
 
         const token = generateToken();
@@ -78,7 +96,8 @@ async function createZoomMeeting() {
         console.log('Meeting Link:', meetingDetails.join_url);
         console.log('Meeting ID:', meetingDetails.id);
         console.log('Meeting Password:', meetingDetails.password);
-        console.log('Meeting Time (London):', meetingDateTime.format('YYYY-MM-DD HH:mm'));
+        // Format the output date in UK format
+        console.log('Meeting Time (London):', meetingDateTime.format('DD-MM-YYYY HH:mm'));
 
         // If there are attendees, add them to the meeting
         if (attendeesList.length > 0) {

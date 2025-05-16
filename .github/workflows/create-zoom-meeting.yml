@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       meeting_date:
-        description: 'Date of the meeting'
+        description: 'Date of the meeting (format: DD-MM-YYYY, e.g., 16-05-2025)'
         required: true
         type: string
       meeting_time:
@@ -62,7 +62,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install jsonwebtoken axios moment
+          npm install jsonwebtoken axios moment moment-timezone
 
       - name: Create Zoom Meeting
         env:
